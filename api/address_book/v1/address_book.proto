@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package address_book.v1;
+
+option go_package = "week-04/api/address_book/v1;v1";
+
+message PersonBaseData {
+    string name = 1;
+    string email = 2;
+
+    enum PhoneType {
+        MOBILE = 0;
+        TELEPHONE = 1;
+        HOME = 2;
+    }
+
+    PhoneType phone_type = 3;
+    string phone = 4;
+}
+
+message Person {
+    PersonBaseData baseData = 1;
+    int64 id = 2;
+}
+
+message AddressBook {
+    repeated Person preson = 1;
+}
+
+service AddressBookService {
+    rpc GetAddressBook (GetAddressBookRequest) returns (AddressBookResponse);
+    rpc CreateAddressBook (CreateAddressBookRequest) returns (AddressBookResponse);
+    rpc UpdateAddressBook (UpdateAddressBookRequest) returns (AddressBookResponse);
+    rpc DeleteAddressBook (DeleteAddressBookRequest) returns (AddressBookResponse);
+}
+
+
+message GetAddressBookRequest {
+    int64 id = 1;
+}
+
+message CreateAddressBookRequest {
+    PersonBaseData person_request = 1;
+}
+
+message UpdateAddressBookRequest {
+    int64 id = 1;
+    PersonBaseData person_request = 2;
+}
+
+message DeleteAddressBookRequest {
+    int64 id = 1;
+}
+
+message AddressBookResponse {
+    int64 id = 1;
+    PersonBaseData person_data = 2;
+}

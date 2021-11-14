@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package address_book.v1;
+
+option go_package = "week-04/api/address_book/v1;v1";
+option java_multiple_files = true;
+option objc_class_prefix = "KratosErrors";
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.EnumOptions {
+  int32 default_code = 1208;
+}
+
+extend google.protobuf.EnumValueOptions {
+  int32 code = 1209;
+}
+
+enum ErrorReason {
+    option (default_code) = 500;
+  
+    ADDRESS_BOOK_NOT_FOUND = 0 [(code) = 404];
+    CONTENT_MISSING = 1 [(code) = 400];
+}
