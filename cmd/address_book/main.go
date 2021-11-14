@@ -1,26 +1,22 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"week-04/pkg/myGrpc"
 
 	"github.com/kataras/iris/v12"
+	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
-// go build -ldflags "-X main.Version=x.y.z"
-var (
-	// Name is the name of the compiled software.
-	Name string
-	// Version is the version of the compiled software.
-	Version string
-	// flagconf is the config flag.
-	flagconf string
-
-	id, _ = os.Hostname()
-)
+var mgs *myGrpc.Server
 
 func newApp(gs *myGrpc.Server) *iris.Application {
 	app := iris.New()
@@ -30,32 +26,110 @@ func newApp(gs *myGrpc.Server) *iris.Application {
 		log.Fatalf("tcp listen failed:%v", err)
 	}
 
-	// gs.Listen(listen)
-	go gs.Server.Serve(listen)
+	mgs = gs
+	mgs.Listener(listen)
 
 	return app
 }
 
 func main() {
-	// c := config.New(
-	// 	config.WithSource(
-	// 		file.NewSource(flagconf),
-	// 	),
-	// )
-	// var bc conf.Bootstrap
-	// if err := c.Scan(&bc); err != nil {
-	// 	panic(err)
-	// }
-
 	app, cleanup, err := initApp()
 	if err != nil {
 		fmt.Println("启动失败", err)
 	}
 	defer cleanup()
 
-	fmt.Println(app)
-	// 处理rpc接口
-	// go gs.Server.
+	// 服务启动
+	ctx := context.Background()
+	startServe(app, ctx)
+}
 
-	app.Run(iris.Addr(fmt.Sprintf(":%d", 8080)), iris.WithoutServerError(iris.ErrServerClosed))
+// 启动多个服务信息
+func startServe(app *iris.Application, ctx context.Context) {
+	// 生成errgroup
+	g, cxt := errgroup.WithContext(ctx)
+
+	// 生成处理请求的handler
+	mux := http.NewServeMux()
+
+	// 模拟页面申请退出
+	reqOut := make(chan struct{})
+	// 注册路由信息
+	out(app, reqOut)
+	mux.HandleFunc("/out", func(w http.ResponseWriter, req *http.Request) {
+		fmt.Fprintf(w, "shutting down")
+		reqOut <- struct{}{}
+	})
+
+	g.Go(func() error {
+		select {
+		case <-reqOut:
+			log.Println("shutdown from request")
+		case <-cxt.Done():
+			log.Println("shutdown from errgroup")
+		}
+
+		return stopServe(app, ctx)
+	})
+
+	// 发起http服务
+	g.Go(func() error {
+		log.Println("http server start")
+
+		err := app.Run(iris.Addr(":8080"), iris.WithoutServerError(iris.ErrServerClosed))
+		if err != nil {
+			return errors.Wrap(err, "http serve fail")
+		}
+
+		return nil
+	})
+
+	// 发起grpc服务
+	g.Go(func() error {
+		log.Println("grpc server start")
+
+		err := mgs.Server.Serve(mgs.GetListener())
+		if err != nil {
+			return errors.Wrap(err, "grpc serve fail")
+		}
+
+		return nil
+	})
+
+	done := make(chan os.Signal)
+	// 创建系统信号接收器
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	// 监听linux signal退出通道
+	g.Go(func() error {
+		select {
+		case <-done:
+			log.Println("shutdown from signal")
+		case <-cxt.Done():
+			log.Println("shutdown from errgroup")
+		}
+
+		return stopServe(app, ctx)
+	})
+
+	if err := g.Wait(); err != nil {
+		log.Println(err)
+	}
+}
+
+func out(app *iris.Application, reqOut chan struct{}) {
+	app.Get("/out", func(c iris.Context) {
+		c.ResponseWriter().Write([]byte("shutting down"))
+
+		reqOut <- struct{}{}
+	})
+}
+
+func stopServe(app *iris.Application, ctx context.Context) error {
+	// 关闭http
+	app.Shutdown(ctx)
+	// 关闭grpc
+	mgs.Server.Stop()
+
+	return errors.New("out")
 }
