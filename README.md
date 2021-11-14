@@ -1,11 +1,24 @@
 # week-04
 go course week-04 code
 
-### 此为一个简单例子，暂未做配置信息等（参考了kratos v2）
+## 1.运行例子
+```
+运行服务端方法：
+方法1：直接执行 go run ./cmd/address_book/main.go ./cmd/address_book/wire_gen.go 
+方法2：构建服务, go build ./cmd/address_book，然后执行目录下方的可执行文件 address_book
+
+服务监听的是8080端口，可以通过请求http://localhost:8080/out或者命令行直接停止运行
+
+客户端代码在./cmd/client，可通过和上方服务端运行方法启动
+
+客户端监听的是8000端口，可通过请求http://localhost:8000/address_book得到返回的address_book信息
+```
+
+## 2.此为一个简单例子，暂未做配置信息等（参考了kratos v2）
 
 #### /api  放置对外接口的定义信息
 ```
-通过proto文件生成对应的关联信息，
+通过protocbuffer生成对应的关联信息，
 对应目录下，根据项目和版本号放置，如：
 address_book项目的v1版本，对应的文件路径为api/address_book/v1
 ```
